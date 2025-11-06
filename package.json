@@ -1,0 +1,26 @@
+{
+  "name": "collaborative-canvas",
+  "version": "1.0.0",
+  "description": "Real-time collaborative drawing canvas application",
+  "main": "Server/server.js",
+  "scripts": {
+    "start": "cd Server && npm start",
+    "dev": "cd Server && npm run dev",
+    "install-server": "cd Server && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "canvas",
+    "collaborative",
+    "drawing",
+    "websocket",
+    "socket.io",
+    "real-time"
+  ],
+  "author": "",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}
