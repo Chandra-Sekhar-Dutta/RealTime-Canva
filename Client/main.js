@@ -201,21 +201,25 @@ class CollaborativeCanvasApp {
     };
     
     this.wsClient.onUserJoin = (data) => {
-      this.showNotification(`${data.username} joined`, 'info');
       this.users.set(data.userId, {
         userId: data.userId,
         username: data.username,
         color: data.color
       });
       this.updateUsersList();
+      
+      const totalUsers = this.users.size + 1; // +1 for current user
+      this.showNotification(`${data.username} joined • ${totalUsers} user${totalUsers > 1 ? 's' : ''} online`, 'success');
     };
     
     this.wsClient.onUserLeave = (data) => {
       const user = this.users.get(data.userId);
       if (user) {
-        this.showNotification(`${user.username} left`, 'info');
         this.users.delete(data.userId);
         this.updateUsersList();
+        
+        const totalUsers = this.users.size + 1; // +1 for current user
+        this.showNotification(`${user.username} left • ${totalUsers} user${totalUsers > 1 ? 's' : ''} online`, 'warning');
       }
       // Remove their cursor
       this.updateRemoteCursor(data.userId, '', '', null);
@@ -333,7 +337,105 @@ class CollaborativeCanvasApp {
   
   showNotification(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
-    // TODO: Implement toast notifications
+    
+    // Create toast container if it doesn't exist
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      `;
+      document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    // Set icon based on type
+    const icons = {
+      success: 'fa-check-circle',
+      error: 'fa-exclamation-circle',
+      warning: 'fa-exclamation-triangle',
+      info: 'fa-info-circle'
+    };
+    
+    // Set colors based on type
+    const colors = {
+      success: '#10b981',
+      error: '#ef4444',
+      warning: '#f59e0b',
+      info: '#3b82f6'
+    };
+    
+    toast.style.cssText = `
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(10px);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border-left: 4px solid ${colors[type]};
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 250px;
+      animation: slideInRight 0.3s ease;
+      pointer-events: auto;
+      font-size: 14px;
+    `;
+    
+    toast.innerHTML = `
+      <i class="fas ${icons[type]}" style="color: ${colors[type]}; font-size: 18px;"></i>
+      <span>${message}</span>
+    `;
+    
+    // Add animation keyframes if not already added
+    if (!document.getElementById('toast-animations')) {
+      const style = document.createElement('style');
+      style.id = 'toast-animations';
+      style.textContent = `
+        @keyframes slideInRight {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes slideOutRight {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    toastContainer.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.3s ease';
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, 3000);
   }
   
   createUsersPanel() {
