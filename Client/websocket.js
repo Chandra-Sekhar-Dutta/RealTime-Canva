@@ -23,6 +23,7 @@ export class WebSocketClient {
     this.onUserLeave = null;
     this.onCursorMove = null;
     this.onUsersUpdate = null;
+    this.onUsernameAssigned = null; // New handler for assigned username
   }
   
   connect(roomId = 'default', userInfo = {}) {
@@ -116,6 +117,12 @@ export class WebSocketClient {
     
     this.socket.on('users-update', (data) => {
       if (this.onUsersUpdate) this.onUsersUpdate(data.users);
+    });
+    
+    this.socket.on('username-assigned', (data) => {
+      console.log('Username assigned:', data.username);
+      this.username = data.username;
+      if (this.onUsernameAssigned) this.onUsernameAssigned(data.username);
     });
     
     this.socket.on('error', (error) => {

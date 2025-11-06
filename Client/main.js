@@ -10,7 +10,6 @@ class CollaborativeCanvasApp {
   constructor() {
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    this.username = urlParams.get('username') || 'Anonymous';
     this.userColor = urlParams.get('color') || '#6366f1';
     this.roomId = urlParams.get('room') || 'default';
     
@@ -22,10 +21,13 @@ class CollaborativeCanvasApp {
     }
     this.userId = storedUserId;
     
-    console.log('Initialized with userId:', this.userId, 'username:', this.username);
+    // Username will be assigned by server
+    this.username = 'Anonymous';
     
-    // Redirect to signin if no username (only if we're on the canvas page)
-    if (!urlParams.get('username') && window.location.pathname.includes('canvas')) {
+    console.log('Initialized with userId:', this.userId);
+    
+    // Redirect to signin if no room (only if we're on the canvas page)
+    if (!urlParams.get('room') && window.location.pathname.includes('canvas')) {
       window.location.href = '/';
       return;
     }
@@ -164,6 +166,20 @@ class CollaborativeCanvasApp {
       this.showNotification('Connected to server', 'success');
       // Request current canvas state from server
       this.wsClient.requestCanvasState();
+    };
+    
+    this.wsClient.onUsernameAssigned = (username) => {
+      console.log('Assigned username:', username);
+      this.username = username;
+      // Update the room info display with assigned username
+      const roomInfo = document.querySelector('.room-info');
+      if (roomInfo) {
+        roomInfo.innerHTML = `
+          <i class="fas fa-door-open"></i> 
+          Room: ${this.roomId.substring(0, 8)}... | 
+          <i class="fas fa-user"></i> ${this.username}
+        `;
+      }
     };
     
     this.wsClient.onDisconnect = () => {

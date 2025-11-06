@@ -32,6 +32,9 @@ const io = new Server(server, {
 const roomManager = new RoomManager();
 const drawingStateManager = new DrawingStateManager();
 
+// Counter for anonymous usernames
+const roomUserCounters = new Map(); // roomId -> counter
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -85,7 +88,14 @@ io.on('connection', (socket) => {
   socket.on('join-room', ({ roomId, userId, username, color }) => {
     currentRoom = roomId;
     currentUserId = userId;
-    currentUsername = username || 'Anonymous';
+    
+    // Assign anonymous username
+    if (!roomUserCounters.has(roomId)) {
+      roomUserCounters.set(roomId, 1);
+    }
+    const userNumber = roomUserCounters.get(roomId);
+    currentUsername = `User${userNumber}`;
+    roomUserCounters.set(roomId, userNumber + 1);
     
     // Join Socket.IO room
     socket.join(roomId);
@@ -101,7 +111,8 @@ io.on('connection', (socket) => {
       color: c.color
     }));
     
-    // Send current users to new client
+    // Send assigned username and current users to new client
+    socket.emit('username-assigned', { username: currentUsername });
     socket.emit('users-update', { users: users.filter(u => u.userId !== userId) });
     
     // Send current canvas state to new client
