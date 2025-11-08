@@ -19,6 +19,8 @@ export class WebSocketClient {
     this.onUsersUpdate = null;
     this.onUsernameAssigned = null;
     this.onClearCanvas = null;
+    this.onUndo = null;
+    this.onRedo = null;
   }
   
   // Establish connection with fallback to polling if WebSocket fails
@@ -123,6 +125,20 @@ export class WebSocketClient {
       if (this.onClearCanvas) this.onClearCanvas(data);
     });
     
+    this.socket.on('undo', (data) => {
+      console.log('Undo event from:', data.userId);
+      if (data.userId !== this.userId && this.onUndo) {
+        this.onUndo(data);
+      }
+    });
+    
+    this.socket.on('redo', (data) => {
+      console.log('Redo event from:', data.userId);
+      if (data.userId !== this.userId && this.onRedo) {
+        this.onRedo(data);
+      }
+    });
+    
     this.socket.on('error', (error) => {
       console.error('Socket error:', error);
       if (this.onError) this.onError(error);
@@ -174,6 +190,26 @@ export class WebSocketClient {
     this.socket.emit('clear-canvas', {
       roomId: this.roomId,
       userId: this.userId
+    });
+  }
+  
+  sendUndo(canvasData) {
+    if (!this.connected || !this.socket) return;
+    
+    this.socket.emit('undo', {
+      roomId: this.roomId,
+      userId: this.userId,
+      canvasData
+    });
+  }
+  
+  sendRedo(canvasData) {
+    if (!this.connected || !this.socket) return;
+    
+    this.socket.emit('redo', {
+      roomId: this.roomId,
+      userId: this.userId,
+      canvasData
     });
   }
   

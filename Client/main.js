@@ -96,12 +96,28 @@ class CollaborativeCanvasApp {
       this.updateBrushPreview();
     });
     
-    this.undoBtn.addEventListener('click', () => {
-      this.canvasManager.undo();
+    this.undoBtn.addEventListener('click', async () => {
+      const success = await this.canvasManager.undo();
+      if (success) {
+        // Broadcast the undo action with the new canvas state (after it's been applied)
+        const canvasData = this.canvasManager.getCanvasData();
+        console.log('Sending undo with canvas data:', canvasData.substring(0, 50) + '...');
+        this.wsClient.sendUndo(canvasData);
+      } else {
+        console.log('Undo failed - nothing to undo');
+      }
     });
     
-    this.redoBtn.addEventListener('click', () => {
-      this.canvasManager.redo();
+    this.redoBtn.addEventListener('click', async () => {
+      const success = await this.canvasManager.redo();
+      if (success) {
+        // Broadcast the redo action with the new canvas state (after it's been applied)
+        const canvasData = this.canvasManager.getCanvasData();
+        console.log('Sending redo with canvas data:', canvasData.substring(0, 50) + '...');
+        this.wsClient.sendRedo(canvasData);
+      } else {
+        console.log('Redo failed - nothing to redo');
+      }
     });
     
     this.clearBtn.addEventListener('click', () => {
@@ -207,6 +223,28 @@ class CollaborativeCanvasApp {
       }
     };
     
+    this.wsClient.onUndo = (data) => {
+      console.log('Undo event received from:', data.userId, 'Has canvas data:', !!data.canvasData);
+      // Update the remote user's canvas with their undo state
+      if (data.canvasData && data.userId) {
+        this.canvasManager.updateRemoteCanvas(data.userId, data.canvasData);
+        const user = this.users.get(data.userId);
+        const username = user ? user.username : 'Someone';
+        this.showNotification(`${username} undid their action`, 'info');
+      }
+    };
+    
+    this.wsClient.onRedo = (data) => {
+      console.log('Redo event received from:', data.userId, 'Has canvas data:', !!data.canvasData);
+      // Update the remote user's canvas with their redo state
+      if (data.canvasData && data.userId) {
+        this.canvasManager.updateRemoteCanvas(data.userId, data.canvasData);
+        const user = this.users.get(data.userId);
+        const username = user ? user.username : 'Someone';
+        this.showNotification(`${username} redid their action`, 'info');
+      }
+    };
+    
     this.wsClient.onUsersUpdate = (users) => {
       this.users.clear();
       users.forEach(user => {
@@ -223,19 +261,31 @@ class CollaborativeCanvasApp {
   }
   
   setupKeyboardShortcuts() {
-    window.addEventListener('keydown', (e) => {
+    window.addEventListener('keydown', async (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
       
       if (ctrl && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
-          this.canvasManager.redo();
+          const success = await this.canvasManager.redo();
+          if (success) {
+            const canvasData = this.canvasManager.getCanvasData();
+            this.wsClient.sendRedo(canvasData);
+          }
         } else {
-          this.canvasManager.undo();
+          const success = await this.canvasManager.undo();
+          if (success) {
+            const canvasData = this.canvasManager.getCanvasData();
+            this.wsClient.sendUndo(canvasData);
+          }
         }
       } else if (ctrl && e.key.toLowerCase() === 'y') {
         e.preventDefault();
-        this.canvasManager.redo();
+        const success = await this.canvasManager.redo();
+        if (success) {
+          const canvasData = this.canvasManager.getCanvasData();
+          this.wsClient.sendRedo(canvasData);
+        }
       }
       else if (e.key.toLowerCase() === 'b' && !ctrl) {
         e.preventDefault();

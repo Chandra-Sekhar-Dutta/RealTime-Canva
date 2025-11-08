@@ -213,36 +213,41 @@ export class CanvasManager {
   }
   
   undo() {
-    if (this.undoStack.length === 0) return false;
+    if (this.undoStack.length === 0) return Promise.resolve(false);
     
     this.redoStack.push(this.userCanvas.toDataURL());
     const dataUrl = this.undoStack.pop();
-    this.applyDataUrl(dataUrl);
-    return true;
+    return this.applyDataUrl(dataUrl).then(() => true);
   }
   
   redo() {
-    if (this.redoStack.length === 0) return false;
+    if (this.redoStack.length === 0) return Promise.resolve(false);
     
     this.undoStack.push(this.userCanvas.toDataURL());
     const dataUrl = this.redoStack.pop();
-    this.applyDataUrl(dataUrl);
-    return true;
+    return this.applyDataUrl(dataUrl).then(() => true);
   }
   
   applyDataUrl(dataUrl) {
-    const img = new Image();
-    img.onload = () => {
-      const rect = this.canvas.getBoundingClientRect();
-      this.userCtx.save();
-      this.userCtx.setTransform(1, 0, 0, 1, 0, 0);
-      this.userCtx.clearRect(0, 0, this.userCanvas.width, this.userCanvas.height);
-      this.userCtx.restore();
-      this.userCtx.globalCompositeOperation = 'source-over';
-      this.userCtx.drawImage(img, 0, 0, rect.width, rect.height);
-      this.composeLayers();
-    };
-    img.src = dataUrl;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const rect = this.canvas.getBoundingClientRect();
+        this.userCtx.save();
+        this.userCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.userCtx.clearRect(0, 0, this.userCanvas.width, this.userCanvas.height);
+        this.userCtx.restore();
+        this.userCtx.globalCompositeOperation = 'source-over';
+        this.userCtx.drawImage(img, 0, 0, rect.width, rect.height);
+        this.composeLayers();
+        resolve();
+      };
+      img.onerror = () => {
+        console.error('Failed to apply canvas data');
+        reject(new Error('Failed to load image'));
+      };
+      img.src = dataUrl;
+    });
   }
   
   clear() {
@@ -278,6 +283,33 @@ export class CanvasManager {
       this.remoteCanvases.delete(userId);
       this.composeLayers();
     }
+  }
+  
+  updateRemoteCanvas(userId, dataUrl) {
+    // Update a specific user's canvas with new data (for undo/redo sync)
+    if (!userId || !dataUrl) {
+      console.warn('updateRemoteCanvas called with invalid parameters', { userId, hasDataUrl: !!dataUrl });
+      return;
+    }
+    
+    console.log('Updating remote canvas for user:', userId);
+    const remoteCanvas = this.getOrCreateRemoteCanvas(userId);
+    const img = new Image();
+    img.onload = () => {
+      const rect = this.canvas.getBoundingClientRect();
+      remoteCanvas.ctx.save();
+      remoteCanvas.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      remoteCanvas.ctx.clearRect(0, 0, remoteCanvas.canvas.width, remoteCanvas.canvas.height);
+      remoteCanvas.ctx.restore();
+      remoteCanvas.ctx.globalCompositeOperation = 'source-over';
+      remoteCanvas.ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      console.log('Remote canvas updated and composing layers');
+      this.composeLayers();
+    };
+    img.onerror = () => {
+      console.error('Failed to load image for remote canvas update');
+    };
+    img.src = dataUrl;
   }
   
   download(filename = 'canvas.png') {

@@ -164,6 +164,26 @@ io.on('connection', (socket) => {
     drawingStateManager.clearState(roomId);
   });
   
+  socket.on('undo', ({ roomId, canvasData }) => {
+    console.log(`Undo event from ${currentUsername} (${currentUserId}) in room ${roomId}`);
+    // Broadcast undo event to all users in the room
+    io.to(roomId).emit('undo', {
+      userId: currentUserId,
+      username: currentUsername,
+      canvasData
+    });
+  });
+  
+  socket.on('redo', ({ roomId, canvasData }) => {
+    console.log(`Redo event from ${currentUsername} (${currentUserId}) in room ${roomId}`);
+    // Broadcast redo event to all users in the room
+    io.to(roomId).emit('redo', {
+      userId: currentUserId,
+      username: currentUsername,
+      canvasData
+    });
+  });
+  
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`);
     
