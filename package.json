@@ -1,9 +1,10 @@
 {
   "name": "collaborative-canvas",
   "version": "1.0.0",
-  "description": "Real-time collaborative drawing canvas application",
-  "main": "Server/server.js",
+  "description": "Real-time collaborative drawing canvas application with WebSocket support",
+  "main": "Server/Server.js",
   "scripts": {
+    "install": "cd Server && npm install",
     "start": "cd Server && npm start",
     "dev": "cd Server && npm run dev",
     "install-server": "cd Server && npm install",
@@ -15,12 +16,18 @@
     "drawing",
     "websocket",
     "socket.io",
-    "real-time"
+    "real-time",
+    "html5-canvas",
+    "multiplayer"
   ],
-  "author": "",
+  "author": "Chandra Sekhar Dutta",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/Chandra-Sekhar-Dutta/RealTime-Canva"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
   }
 }
