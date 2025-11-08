@@ -29,7 +29,7 @@ Real-time collaborative drawing application using WebSocket for synchronization 
 ## Data Flow
 
 ### Drawing Event Flow
-![Drawing Event Flow Diagram](Client/assets/DrawingeventFlow.png)
+![Drawing Event Flow Diagram](Client/assets/DrawingEventFlow.png)
 
 User draws → Canvas renders locally → Event sent to server → Server broadcasts to room → Other clients render
 
