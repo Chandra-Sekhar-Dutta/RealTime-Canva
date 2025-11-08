@@ -6,7 +6,7 @@ This document describes the architecture of the Collaborative Canvas application
 
 ## High-Level Architecture
 
-![System Architecture Diagram](assets/WorkingFlowChart.png)
+![System Architecture Diagram](Client/assets/WorkingFlowChart.png)
 
 ## Component Architecture
 
@@ -99,15 +99,15 @@ This document describes the architecture of the Collaborative Canvas application
 
 ### 1. Drawing Event Flow
 
-![Drawing Event Flow Diagram](assets/DrawingeventFlow.png)
+![Drawing Event Flow Diagram](Client/assets/DrawingeventFlow.png)
 
 ### 2. Room Join Flow
 
-![Room Join Flow Diagram](assets/RoomJoinFlow.png)
+![Room Join Flow Diagram](Client/assets/RoomJoinFlow.png)
 
 ### 3. Canvas State Synchronization
 
-![Canvas State Synchronization Diagram](assets/CanvasStateSynchronization.png)
+![Canvas State Synchronization Diagram](Client/assets/CanvasStateSynchronization.png)
 
 ## Communication Protocol
 
@@ -181,11 +181,11 @@ class CanvasManager {
 
 #### Undo Operation Flow
 
-![Undo Operation Flow Diagram](assets/UndoOperationFlow.png)
+![Undo Operation Flow Diagram](Client/assets/UndoOperationFlow.png)
 
 #### Redo Operation Flow
 
-![Redo Operation Flow Diagram](assets/RedoOperationFlow.png)
+![Redo Operation Flow Diagram](Client/assets/RedoOperationFlow.png)
 
 #### Stack Management
 
