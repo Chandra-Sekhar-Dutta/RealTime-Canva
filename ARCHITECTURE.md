@@ -2,153 +2,60 @@
 
 ## Overview
 
-This document describes the architecture of the Collaborative Canvas application, a real-time multi-user drawing platform built with modern web technologies. It covers data flow, WebSocket protocols, synchronization strategies, performance optimizations, and conflict resolution mechanisms.
+Real-time collaborative drawing application using WebSocket for synchronization between multiple users.
 
 ## High-Level Architecture
 
 ![System Architecture Diagram](Client/assets/WorkingFlowChart.png)
 
-## Component Architecture
+## Components
 
-### Client-Side Components
+### Client-Side
 
-#### 1. **Main Application (`main.js`)**
-- **Responsibility**: Application initialization and orchestration
-- **Key Functions**:
-  - Initialize CanvasManager and WebSocketClient
-  - Wire up UI event handlers
-  - Coordinate between modules
-  - Handle keyboard shortcuts
-  - Display notifications
+**main.js** - Application initialization, UI handlers, keyboard shortcuts
 
-#### 2. **Canvas Manager (`canvas.js`)**
-- **Responsibility**: All drawing operations and canvas state
-- **Key Functions**:
-  - Handle pointer events (mouse, touch, pen)
-  - Draw strokes with configurable tools
-  - Manage undo/redo stacks
-  - Convert canvas to/from data URLs
-  - Apply remote drawing operations
-- **State**:
-  - Current tool (brush/eraser)
-  - Color and stroke width
-  - Drawing state (active/inactive)
-  - History stacks (undo/redo)
-- **Design Pattern**: Module pattern with clear API
+**canvas.js** - Drawing operations, undo/redo, pointer events handling
 
-#### 3. **WebSocket Client (`websocket.js`)**
-- **Responsibility**: Real-time communication with server
-- **Key Functions**:
-  - Connect/disconnect from server
-  - Join/leave rooms
-  - Send drawing events
-  - Receive and process remote events
-  - Handle connection state
-- **Events**:
-  - `drawing` - Real-time stroke data
-  - `canvas-state` - Full canvas synchronization
-  - `user-joined` / `user-left` - Presence notifications
-  - `clear-canvas` - Clear event
-- **Design Pattern**: Event-driven with callbacks
+**websocket.js** - WebSocket communication, event handling
 
-### Server-Side Components
+### Server-Side
 
-#### 1. **Express Server (`server.js`)**
-- **Responsibility**: HTTP server and WebSocket gateway
-- **Key Functions**:
-  - Serve static client files
-  - Provide REST API endpoints
-  - Handle Socket.IO connections
-  - Route events between clients
-  - Manage server lifecycle
-- **Endpoints**:
-  - `GET /` - Serve client app
-  - `GET /api/health` - Health check
-  - `GET /api/rooms` - List active rooms
-  - `GET /api/rooms/:roomId` - Get room info
+**Server.js** - Express server, Socket.IO setup, API endpoints
 
-#### 2. **Room Manager (`rooms.js`)**
-- **Responsibility**: Multi-room session management
-- **Key Functions**:
-  - Create/delete rooms
-  - Track clients per room
-  - Handle join/leave operations
-  - Clean up inactive rooms
-  - Provide room statistics
-- **Data Structure**:
-  ```javascript
-  {
-    id: 'room-name',
-    clients: Set<{clientId, socketId}>,
-    canvasState: DataURL,
-    createdAt: Date,
-    lastActivity: Date
-  }
-  ```
+**rooms.js** - Room management, client tracking
 
-#### 3. **Drawing State Manager (`drawing-state.js`)**
-- **Responsibility**: Canvas state persistence
-- **Key Functions**:
-  - Save/load canvas data
-  - Version tracking
-  - Cleanup old states
-  - Provide state metadata
-- **Storage**: In-memory Map (can be extended to Redis/DB)
+**drawing-state.js** - Canvas state persistence (in-memory)
 
 ## Data Flow
 
-### 1. Drawing Event Flow
-
+### Drawing Event Flow
 ![Drawing Event Flow Diagram](Client/assets/DrawingeventFlow.png)
 
-### 2. Room Join Flow
+User draws → Canvas renders locally → Event sent to server → Server broadcasts to room → Other clients render
 
+### Room Join Flow
 ![Room Join Flow Diagram](Client/assets/RoomJoinFlow.png)
 
-### 3. Canvas State Synchronization
+User joins → Server adds to room → Canvas state sent to user → User receives ongoing events
 
+### Canvas State Synchronization
 ![Canvas State Synchronization Diagram](Client/assets/CanvasStateSynchronization.png)
 
-## Communication Protocol
+Canvas changes → Convert to data URL → Store on server → Send to new users
 
-### WebSocket Events
+## WebSocket Events
 
-#### Client → Server
+### Client → Server
+- `join-room` - Join a drawing room
+- `drawing` - Send drawing stroke data
+- `canvas-state` - Save canvas state
+- `clear-canvas` - Clear the canvas
 
------------------------------------------------------------------------------------------
-| Event                  | Data                              | Purpose                  |
-|------------------------|-----------------------------------|--------------------------|
-| `join-room`            | `{roomId, clientId}`              | Join a drawing room      |
-| `drawing`              | `{type, pos, mode, color, width}` | Real-time drawing stroke |
-| `canvas-state`         | `{roomId, canvasData}`            | Save canvas state        |
-| `request-canvas-state` | `{roomId}`                        | Request current state    |
-| `clear-canvas`         | `{roomId}`                        | Clear the canvas         |
------------------------------------------------------------------------------------------
-
-#### Server → Client
-
---------------------------------------------------------------------------------------
-| Event          | Data                                       | Purpose              |
-|----------------|--------------------------------------------|----------------------|
-| `canvas-state` | `{canvasData, version}`                    | Full canvas sync     |
-| `drawing`      | `{type, pos, mode, color, width, clientId}`| Remote drawing event |
-| `user-joined`  | `{clientId, socketId}`                     | User joined room     |
-| `user-left`    | `{clientId, socketId}`                     | User left room       |
-| `clear-canvas` | `{clientId}`                               | Canvas was cleared   |
---------------------------------------------------------------------------------------
-
-### Drawing Event Types
-
-```javascript
-{
-  type: 'start' | 'move' | 'end',
-  pos: {x: number, y: number},
-  mode: 'brush' | 'eraser',
-  color: '#RRGGBB',
-  width: number,
-  clientId: string
-}
-```
+### Server → Client
+- `canvas-state` - Receive canvas state
+- `drawing` - Receive remote drawing
+- `user-joined` / `user-left` - User presence
+- `clear-canvas` - Canvas cleared by user
 
 ## Undo/Redo Strategy
 
@@ -172,9 +79,9 @@ This document describes the architecture of the Collaborative Canvas application
 ```javascript
 class CanvasManager {
   constructor() {
-    this.undoStack = [];    // Array of canvas data URLs
-    this.redoStack = [];    // Array of canvas data URLs
-    this.MAX_STACK = 50;    // Limit to prevent memory issues
+    this.undoStack = [];    
+    this.redoStack = [];    
+    this.MAX_STACK = 50;    
   }
 }
 ```
@@ -191,13 +98,11 @@ class CanvasManager {
 
 ```javascript
 pushUndo() {
-  // Called before any drawing operation
   if (this.undoStack.length >= this.MAX_STACK) {
-    this.undoStack.shift();  // Remove oldest entry
+    this.undoStack.shift();  
   }
   this.undoStack.push(this.canvas.toDataURL());
   
-  // Clear redo stack on new action
   if (this.redoStack.length > this.MAX_STACK) {
     this.redoStack.shift();
   }
@@ -236,7 +141,6 @@ pushUndo() {
 
 #### 1. Operation-Based History (OT - Operational Transformation)
 ```javascript
-// Store operations instead of full canvas snapshots
 undoStack = [
   {type: 'stroke', points: [...], color: '#000', width: 5},
   {type: 'erase', points: [...], width: 20},
@@ -248,8 +152,7 @@ undoStack = [
 
 #### 2. Global Collaborative Undo (Not Recommended)
 ```javascript
-// Synchronized undo across all users
-globalHistory = [
+  globalHistory = [
   {userId: 'user1', operation: {...}, timestamp: 123},
   {userId: 'user2', operation: {...}, timestamp: 124}
 ]
@@ -263,8 +166,7 @@ globalHistory = [
 
 #### 3. User-Specific Global Undo
 ```javascript
-// Each user can only undo their own strokes globally
-userHistory = {
+  userHistory = {
   'user1': [stroke1, stroke2, ...],
   'user2': [stroke3, stroke4, ...]
 }
@@ -297,16 +199,15 @@ The local-only undo/redo strategy provides:
 ```javascript
 class CanvasManager {
   constructor(canvasElement) {
-    this.canvas = canvasElement;              // Visible canvas (local + remote)
+    this.canvas = canvasElement;              
     this.ctx = this.canvas.getContext('2d');
     
-    // Off-screen canvas for remote drawings
+
     this.remoteCanvas = document.createElement('canvas');
     this.remoteCtx = this.remoteCanvas.getContext('2d');
   }
   
   composeLayers() {
-    // Composite remote layer on top of local layer
     this.ctx.drawImage(this.remoteCanvas, 0, 0);
   }
 }
@@ -330,11 +231,9 @@ class CanvasManager {
 
 ```javascript
 handlePointerMove(e) {
-  // Render locally first (no lag)
   this.ctx.lineTo(pos.x, pos.y);
   this.ctx.stroke();
   
-  // Then emit to server (async)
   this.emitDrawEvent('move', pos);
 }
 ```
@@ -355,7 +254,6 @@ handlePointerMove(e) {
 **Strategy**: Let browser's pointer event system naturally throttle events
 
 ```javascript
-// No manual throttling - browser provides ~60-120 Hz update rate
 canvas.addEventListener('pointermove', handlePointerMove);
 ```
 
@@ -366,7 +264,6 @@ canvas.addEventListener('pointermove', handlePointerMove);
 
 **Alternative Considered (Not Implemented):**
 ```javascript
-// Manual throttling (rejected)
 let lastEmit = 0;
 function handlePointerMove(e) {
   if (Date.now() - lastEmit < 16) return;  // Max 60 FPS
