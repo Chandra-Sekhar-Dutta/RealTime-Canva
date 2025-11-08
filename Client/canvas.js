@@ -132,9 +132,8 @@ export class CanvasManager {
     this.userCtx.beginPath();
     this.userCtx.moveTo(this.lastPos.x, this.lastPos.y);
     
-    if (this.mode === 'brush') {
-      this.emitDrawEvent('start', this.lastPos);
-    }
+    // Send drawing events for both brush and eraser
+    this.emitDrawEvent('start', this.lastPos);
   }
   
   handlePointerMove(e) {
@@ -148,9 +147,8 @@ export class CanvasManager {
     // Update display canvas in real-time
     this.composeLayers();
     
-    if (this.mode === 'brush') {
-      this.emitDrawEvent('move', pos);
-    }
+    // Send drawing events for both brush and eraser
+    this.emitDrawEvent('move', pos);
   }
   
   handlePointerUp(e) {
@@ -164,9 +162,8 @@ export class CanvasManager {
       this.canvas.releasePointerCapture(e.pointerId);
     } catch (err) {}
     
-    if (this.mode === 'brush') {
-      this.emitDrawEvent('end', this.lastPos);
-    }
+    // Send drawing events for both brush and eraser
+    this.emitDrawEvent('end', this.lastPos);
     
     this.composeLayers();
   }
@@ -253,19 +250,23 @@ export class CanvasManager {
     }
   }
   
-  // Draw remote user strokes on separate layer (eraser not supported for remote users)
+  // Draw remote user strokes on separate layer (including eraser strokes)
   applyRemoteDrawing(drawData) {
     const { type, pos, mode, color, width } = drawData;
-    
-    if (mode === 'eraser') {
-      return;
-    }
     
     this.remoteCtx.lineCap = 'round';
     this.remoteCtx.lineJoin = 'round';
     this.remoteCtx.lineWidth = width;
-    this.remoteCtx.globalCompositeOperation = 'source-over';
-    this.remoteCtx.strokeStyle = color;
+    
+    if (mode === 'eraser') {
+      // Apply eraser effect to remote layer (erases remote drawings only)
+      this.remoteCtx.globalCompositeOperation = 'destination-out';
+      this.remoteCtx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      // Normal brush drawing
+      this.remoteCtx.globalCompositeOperation = 'source-over';
+      this.remoteCtx.strokeStyle = color;
+    }
     
     if (type === 'start') {
       this.remoteCtx.beginPath();
