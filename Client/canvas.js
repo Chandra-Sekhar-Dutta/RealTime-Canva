@@ -3,6 +3,7 @@ export class CanvasManager {
     this.canvas = canvasElement;
     this.ctx = this.canvas.getContext('2d', { alpha: true });
     
+    // Separate canvas layer for remote users' drawings to prevent conflicts
     this.remoteCanvas = document.createElement('canvas');
     this.remoteCtx = this.remoteCanvas.getContext('2d', { alpha: true });
     
@@ -27,6 +28,7 @@ export class CanvasManager {
     window.addEventListener('resize', () => this.setCanvasSize());
   }
   
+  // Resize canvas while preserving content and handling high-DPI displays
   setCanvasSize() {
     const rect = this.canvas.getBoundingClientRect();
     const data = this.canvas.toDataURL();
@@ -63,6 +65,7 @@ export class CanvasManager {
     remoteImg.src = remoteData;
   }
   
+  // Merge remote users' drawings onto the main canvas for display
   composeLayers() {
     this.ctx.save();
     this.ctx.globalCompositeOperation = 'source-over';
@@ -90,6 +93,7 @@ export class CanvasManager {
     };
   }
   
+  // Capture pointer to prevent losing events if cursor leaves canvas during drawing
   handlePointerDown(e) {
     if (e.button !== undefined && e.button !== 0) return;
     
@@ -223,6 +227,7 @@ export class CanvasManager {
     }
   }
   
+  // Draw remote user strokes on separate layer (eraser not supported for remote users)
   applyRemoteDrawing(drawData) {
     const { type, pos, mode, color, width } = drawData;
     

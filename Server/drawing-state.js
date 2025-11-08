@@ -3,6 +3,7 @@ class DrawingStateManager {
     this.states = new Map();
   }
   
+  // Increment version number for optimistic concurrency control
   saveState(roomId, canvasData) {
     this.states.set(roomId, {
       canvasData,
@@ -41,6 +42,7 @@ class DrawingStateManager {
     };
   }
   
+  // Remove canvas states older than maxAge (default 24 hours) to free memory
   cleanup(maxAge = 86400000) {
     const now = Date.now();
     let cleaned = 0;

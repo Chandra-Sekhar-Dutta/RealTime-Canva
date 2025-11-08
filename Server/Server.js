@@ -23,6 +23,7 @@ const io = new Server(server, {
 const roomManager = new RoomManager();
 const drawingStateManager = new DrawingStateManager();
 
+// Track user number per room for automatic username assignment (User1, User2, etc.)
 const roomUserCounters = new Map();
 
 app.use(cors());
@@ -69,6 +70,7 @@ io.on('connection', (socket) => {
     currentRoom = roomId;
     currentUserId = userId;
     
+    // Generate sequential username (User1, User2, User3...) for this room
     if (!roomUserCounters.has(roomId)) {
       roomUserCounters.set(roomId, 1);
     }
@@ -88,8 +90,10 @@ io.on('connection', (socket) => {
     }));
     
     socket.emit('username-assigned', { username: currentUsername });
+    // Send list of other users (excluding self) to the newly joined user
     socket.emit('users-update', { users: users.filter(u => u.userId !== userId) });
     
+    // Send existing canvas state to newly joined user for synchronization
     const canvasState = drawingStateManager.getState(roomId);
     if (canvasState) {
       socket.emit('canvas-state', {
@@ -108,6 +112,7 @@ io.on('connection', (socket) => {
     console.log(`User ${currentUsername} (${userId}) joined room ${roomId}`);
   });
   
+  // Broadcast cursor position to other users in the room (throttled on client side)
   socket.on('cursor-move', ({ roomId, userId, pos }) => {
     if (!currentRoom) return;
     
@@ -119,6 +124,7 @@ io.on('connection', (socket) => {
     });
   });
   
+  // Forward drawing events to all other users in the room
   socket.on('drawing', (data) => {
     if (!currentRoom) return;
     
@@ -129,6 +135,7 @@ io.on('connection', (socket) => {
     });
   });
   
+  // Save and broadcast complete canvas state for synchronization
   socket.on('canvas-state', ({ roomId, canvasData }) => {
     drawingStateManager.saveState(roomId, canvasData);
     roomManager.setCanvasState(roomId, canvasData);
@@ -178,6 +185,7 @@ io.on('connection', (socket) => {
   });
 });
 
+// Periodic cleanup of inactive rooms and old canvas states (every 5 minutes)
 setInterval(() => {
   roomManager.cleanupInactiveRooms();
   drawingStateManager.cleanup();

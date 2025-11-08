@@ -20,6 +20,7 @@ export class WebSocketClient {
     this.onUsernameAssigned = null;
   }
   
+  // Establish connection with fallback to polling if WebSocket fails
   connect(roomId = 'default', userInfo = {}) {
     this.roomId = roomId;
     this.userId = userInfo.userId || Math.random().toString(36).substring(7);
@@ -68,6 +69,7 @@ export class WebSocketClient {
       if (this.onDisconnect) this.onDisconnect();
     });
     
+    // Ignore drawing events from self to prevent double-drawing
     this.socket.on('drawing', (data) => {
       console.log('Received drawing event from server:', {
         type: data.type,

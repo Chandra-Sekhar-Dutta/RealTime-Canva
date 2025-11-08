@@ -7,6 +7,7 @@ class CollaborativeCanvasApp {
     this.userColor = urlParams.get('color') || '#6366f1';
     this.roomId = urlParams.get('room') || 'default';
     
+    // Generate persistent user ID for the session to maintain identity across reconnects
     let storedUserId = sessionStorage.getItem('canvas_userId');
     if (!storedUserId) {
       storedUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
@@ -455,15 +456,17 @@ class CollaborativeCanvasApp {
     return userEl;
   }
   
+  // Throttle cursor position updates to reduce network traffic
   setupCursorTracking() {
     let lastSent = 0;
-    const throttleMs = 50; // Send cursor position every 50ms max
+    const throttleMs = 50;
     
     this.canvas.addEventListener('pointermove', (e) => {
       const now = Date.now();
       if (now - lastSent < throttleMs) return;
       
       const rect = this.canvas.getBoundingClientRect();
+      // Send normalized coordinates (0-1 range) for resolution-independent positioning
       const pos = {
         x: (e.clientX - rect.left) / rect.width,
         y: (e.clientY - rect.top) / rect.height

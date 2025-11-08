@@ -35,6 +35,7 @@ class RoomManager {
         room.clients.delete(client);
         console.log(`User ${client.username} left room ${roomId} (${room.clients.size} remaining)`);
         
+        // Delete empty rooms after 1 minute to preserve state for quick reconnects
         if (room.clients.size === 0) {
           setTimeout(() => {
             if (room.clients.size === 0) {
@@ -94,6 +95,7 @@ class RoomManager {
     return stats;
   }
   
+  // Remove rooms that have been empty and inactive for more than maxAge (default 1 hour)
   cleanupInactiveRooms(maxAge = 3600000) {
     const now = Date.now();
     for (const [roomId, room] of this.rooms) {
