@@ -1,8 +1,3 @@
-/**
- * WebSocket Client Module
- * Handles real-time communication with the server
- */
-
 export class WebSocketClient {
   constructor(serverUrl = 'http://localhost:3000') {
     this.serverUrl = serverUrl;
@@ -13,7 +8,6 @@ export class WebSocketClient {
     this.username = null;
     this.userColor = null;
     
-    // Event handlers
     this.onConnect = null;
     this.onDisconnect = null;
     this.onDrawing = null;
@@ -23,7 +17,7 @@ export class WebSocketClient {
     this.onUserLeave = null;
     this.onCursorMove = null;
     this.onUsersUpdate = null;
-    this.onUsernameAssigned = null; // New handler for assigned username
+    this.onUsernameAssigned = null;
   }
   
   connect(roomId = 'default', userInfo = {}) {
@@ -33,7 +27,6 @@ export class WebSocketClient {
     this.userColor = userInfo.color || '#6366f1';
     
     try {
-      // Socket.io client connection
       if (typeof io !== 'undefined') {
         this.socket = io(this.serverUrl, {
           transports: ['websocket', 'polling'],
@@ -58,7 +51,6 @@ export class WebSocketClient {
       console.log('Connected to server');
       this.connected = true;
       
-      // Join room with user info
       this.socket.emit('join-room', { 
         roomId: this.roomId, 
         userId: this.userId,
@@ -77,7 +69,6 @@ export class WebSocketClient {
     });
     
     this.socket.on('drawing', (data) => {
-      // Log all received drawing events
       console.log('Received drawing event from server:', {
         type: data.type,
         userId: data.userId,
@@ -86,7 +77,6 @@ export class WebSocketClient {
         shouldProcess: data.userId !== this.userId
       });
       
-      // Only process drawings from other clients
       if (data.userId !== this.userId && this.onDrawing) {
         this.onDrawing(data);
       } else if (data.userId === this.userId) {

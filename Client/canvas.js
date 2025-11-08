@@ -1,29 +1,21 @@
-/**
- * Canvas Drawing Logic Module
- * Handles all drawing operations, tools, undo/redo
- */
-
 export class CanvasManager {
   constructor(canvasElement) {
     this.canvas = canvasElement;
     this.ctx = this.canvas.getContext('2d', { alpha: true });
     
-    // Create an off-screen canvas for remote drawings
     this.remoteCanvas = document.createElement('canvas');
     this.remoteCtx = this.remoteCanvas.getContext('2d', { alpha: true });
     
     this.drawing = false;
     this.lastPos = { x: 0, y: 0 };
-    this.mode = 'brush'; // 'brush' or 'eraser'
+    this.mode = 'brush';
     this.strokeColor = '#000000';
     this.lineWidth = 5;
     
-    // Undo/Redo stacks
     this.undoStack = [];
     this.redoStack = [];
     this.MAX_STACK = 50;
     
-    // Callbacks for external updates
     this.onStateChange = null;
     
     this.initCanvas();
@@ -40,7 +32,6 @@ export class CanvasManager {
     const data = this.canvas.toDataURL();
     const remoteData = this.remoteCanvas.toDataURL();
     
-    // Use device pixel ratio for high-DPI displays
     const dpr = window.devicePixelRatio || 1;
     
     this.canvas.width = Math.floor(rect.width * dpr);
@@ -48,17 +39,14 @@ export class CanvasManager {
     this.remoteCanvas.width = this.canvas.width;
     this.remoteCanvas.height = this.canvas.height;
     
-    // Scale context to match device pixel ratio
     this.ctx.scale(dpr, dpr);
     this.remoteCtx.scale(dpr, dpr);
     
-    // Enable image smoothing for better quality
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
     this.remoteCtx.imageSmoothingEnabled = true;
     this.remoteCtx.imageSmoothingQuality = 'high';
     
-    // Restore content after resize
     const img = new Image();
     img.onload = () => {
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -75,10 +63,7 @@ export class CanvasManager {
     remoteImg.src = remoteData;
   }
   
-  // Composite remote layer on top of local layer
   composeLayers() {
-    // The main canvas already has the local drawing with eraser applied
-    // Just draw the remote layer on top without clearing
     this.ctx.save();
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.imageSmoothingEnabled = true;
@@ -99,7 +84,6 @@ export class CanvasManager {
   
   getPointerPos(e) {
     const rect = this.canvas.getBoundingClientRect();
-    // Account for CSS scaling vs actual canvas size
     return {
       x: (e.clientX - rect.left),
       y: (e.clientY - rect.top)
@@ -130,7 +114,6 @@ export class CanvasManager {
     this.ctx.beginPath();
     this.ctx.moveTo(this.lastPos.x, this.lastPos.y);
     
-    // Only emit drawing event for brush, not eraser
     if (this.mode === 'brush') {
       this.emitDrawEvent('start', this.lastPos);
     }
@@ -144,7 +127,6 @@ export class CanvasManager {
     this.ctx.stroke();
     this.lastPos = pos;
     
-    // Only emit drawing event for brush, not eraser
     if (this.mode === 'brush') {
       this.emitDrawEvent('move', pos);
     }
@@ -161,16 +143,13 @@ export class CanvasManager {
       this.canvas.releasePointerCapture(e.pointerId);
     } catch (err) {}
     
-    // Only emit drawing event for brush, not eraser
     if (this.mode === 'brush') {
       this.emitDrawEvent('end', this.lastPos);
     }
     
-    // Recomposite layers after any operation
     this.composeLayers();
   }
   
-  // Tool methods
   setMode(mode) {
     this.mode = mode;
     if (this.onStateChange) this.onStateChange('mode', mode);
@@ -186,7 +165,6 @@ export class CanvasManager {
     if (this.onStateChange) this.onStateChange('width', width);
   }
   
-  // Undo/Redo
   pushUndo() {
     if (this.undoStack.length >= this.MAX_STACK) this.undoStack.shift();
     this.undoStack.push(this.canvas.toDataURL());
@@ -233,7 +211,6 @@ export class CanvasManager {
     a.click();
   }
   
-  // WebSocket integration hook
   emitDrawEvent(type, pos) {
     if (this.onStateChange) {
       this.onStateChange('draw', {
@@ -246,16 +223,13 @@ export class CanvasManager {
     }
   }
   
-  // Apply remote drawing event
   applyRemoteDrawing(drawData) {
     const { type, pos, mode, color, width } = drawData;
     
-    // Only handle brush strokes from remote users, ignore eraser
     if (mode === 'eraser') {
       return;
     }
     
-    // Draw on remote canvas layer
     this.remoteCtx.lineCap = 'round';
     this.remoteCtx.lineJoin = 'round';
     this.remoteCtx.lineWidth = width;
@@ -268,11 +242,9 @@ export class CanvasManager {
     } else if (type === 'move') {
       this.remoteCtx.lineTo(pos.x, pos.y);
       this.remoteCtx.stroke();
-      // Update display during remote drawing
       this.composeLayers();
     } else if (type === 'end') {
       this.remoteCtx.closePath();
-      // Final update when stroke ends
       this.composeLayers();
     }
   }

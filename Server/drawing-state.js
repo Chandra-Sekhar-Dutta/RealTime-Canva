@@ -1,16 +1,8 @@
-/**
- * Drawing State Management Module
- * Handles canvas state persistence and synchronization
- */
-
 class DrawingStateManager {
   constructor() {
-    this.states = new Map(); // roomId -> canvas state
+    this.states = new Map();
   }
   
-  /**
-   * Save canvas state for a room
-   */
   saveState(roomId, canvasData) {
     this.states.set(roomId, {
       canvasData,
@@ -20,38 +12,23 @@ class DrawingStateManager {
     console.log(`Saved canvas state for room ${roomId}`);
   }
   
-  /**
-   * Get canvas state for a room
-   */
   getState(roomId) {
     return this.states.get(roomId) || null;
   }
   
-  /**
-   * Clear canvas state for a room
-   */
   clearState(roomId) {
     this.states.delete(roomId);
     console.log(`Cleared canvas state for room ${roomId}`);
   }
   
-  /**
-   * Get all room IDs with saved states
-   */
   getAllRoomIds() {
     return Array.from(this.states.keys());
   }
   
-  /**
-   * Check if a room has saved state
-   */
   hasState(roomId) {
     return this.states.has(roomId);
   }
   
-  /**
-   * Get state metadata
-   */
   getStateMetadata(roomId) {
     const state = this.states.get(roomId);
     if (!state) return null;
@@ -64,10 +41,7 @@ class DrawingStateManager {
     };
   }
   
-  /**
-   * Clean up old states
-   */
-  cleanup(maxAge = 86400000) { // 24 hours default
+  cleanup(maxAge = 86400000) {
     const now = Date.now();
     let cleaned = 0;
     
@@ -85,9 +59,6 @@ class DrawingStateManager {
     return cleaned;
   }
   
-  /**
-   * Get storage statistics
-   */
   getStats() {
     let totalSize = 0;
     const roomStats = [];

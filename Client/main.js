@@ -1,43 +1,26 @@
-/**
- * Main Application Entry Point
- * Wires up canvas and websocket modules with UI
- */
-
 import { CanvasManager } from './canvas.js';
 import { WebSocketClient } from './websocket.js';
 
 class CollaborativeCanvasApp {
   constructor() {
-    // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     this.userColor = urlParams.get('color') || '#6366f1';
     this.roomId = urlParams.get('room') || 'default';
     
-    // Generate or retrieve persistent userId
     let storedUserId = sessionStorage.getItem('canvas_userId');
     if (!storedUserId) {
       storedUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       sessionStorage.setItem('canvas_userId', storedUserId);
     }
     this.userId = storedUserId;
-    
-    // Username will be assigned by server
     this.username = 'Anonymous';
     
     console.log('Initialized with userId:', this.userId);
     
-    // Redirect to signin if no room (only if we're on the canvas page)
-    if (!urlParams.get('room') && window.location.pathname.includes('canvas')) {
-      window.location.href = '/';
-      return;
-    }
-    
-    // Don't initialize if no canvas element (we're on signin page)
     if (!document.getElementById('canvas')) {
       return;
     }
     
-    // Get DOM elements
     this.canvas = document.getElementById('canvas');
     this.brushBtn = document.getElementById('brushBtn');
     this.eraserBtn = document.getElementById('eraserBtn');
@@ -54,28 +37,21 @@ class CollaborativeCanvasApp {
     this.toolIndicator = document.getElementById('toolIndicator');
     this.cursorPreview = document.getElementById('cursorPreview');
     
-    // Conflict resolution UI elements
     this.conflictInfo = document.getElementById('conflictInfo');
     this.queueLength = document.getElementById('queueLength');
     this.bufferedStrokes = document.getElementById('bufferedStrokes');
     this.lamportClock = document.getElementById('lamportClock');
     
-    // User management (userId already set above)
-    this.users = new Map(); // userId -> {username, color, cursor}
+    this.users = new Map();
     
-    // Remote cursors container
     this.remoteCursorsContainer = document.createElement('div');
     this.remoteCursorsContainer.id = 'remote-cursors';
     document.querySelector('.canvas-wrapper').appendChild(this.remoteCursorsContainer);
     
-    // Initialize managers
     this.canvasManager = new CanvasManager(this.canvas);
     this.wsClient = new WebSocketClient('http://localhost:3000');
     
-    // Setup conflict resolution monitoring
     this.startConflictMonitoring();
-    
-    // Setup
     this.init();
   }
   
@@ -85,22 +61,17 @@ class CollaborativeCanvasApp {
     this.setupKeyboardShortcuts();
     this.updateUI();
     
-    // Try to connect to WebSocket (gracefully fails if server is offline)
     this.wsClient.connect(this.roomId, {
       userId: this.userId,
       username: this.username,
       color: this.userColor
     });
     
-    // Add users panel to sidebar
     this.createUsersPanel();
-    
-    // Track cursor movement for sharing
     this.setupCursorTracking();
   }
   
   setupUI() {
-    // Tool buttons
     this.brushBtn.addEventListener('click', () => {
       this.canvasManager.setMode('brush');
       this.updateToolUI();
@@ -111,14 +82,12 @@ class CollaborativeCanvasApp {
       this.updateToolUI();
     });
     
-    // Color picker
     this.colorPicker.addEventListener('input', (e) => {
       this.canvasManager.setColor(e.target.value);
       this.colorHex.textContent = e.target.value.toUpperCase();
       this.updateBrushPreview();
     });
     
-    // Width slider
     this.widthRange.addEventListener('input', (e) => {
       const width = parseInt(e.target.value, 10);
       this.canvasManager.setLineWidth(width);
@@ -126,7 +95,6 @@ class CollaborativeCanvasApp {
       this.updateBrushPreview();
     });
     
-    // Action buttons
     this.undoBtn.addEventListener('click', () => {
       this.canvasManager.undo();
     });
@@ -144,15 +112,12 @@ class CollaborativeCanvasApp {
       this.canvasManager.download();
     });
     
-    // Cursor preview
     this.canvas.addEventListener('pointermove', (e) => this.updateCursorPreview(e));
     this.canvas.addEventListener('pointerleave', () => this.updateCursorPreview(null));
     this.canvas.addEventListener('pointerenter', (e) => this.updateCursorPreview(e));
     
-    // Canvas state change callback
     this.canvasManager.onStateChange = (type, data) => {
       if (type === 'draw') {
-        // Send drawing event to other clients
         console.log('Sending drawing event:', data.type, data.strokeId);
         this.wsClient.sendDrawing(data);
       }
@@ -164,14 +129,12 @@ class CollaborativeCanvasApp {
     this.wsClient.onConnect = () => {
       console.log('WebSocket connected');
       this.showNotification('Connected to server', 'success');
-      // Request current canvas state from server
       this.wsClient.requestCanvasState();
     };
     
     this.wsClient.onUsernameAssigned = (username) => {
       console.log('Assigned username:', username);
       this.username = username;
-      // Update the room info display with assigned username
       const roomInfo = document.querySelector('.room-info');
       if (roomInfo) {
         roomInfo.innerHTML = `
@@ -188,13 +151,11 @@ class CollaborativeCanvasApp {
     };
     
     this.wsClient.onDrawing = (drawData) => {
-      // Apply remote drawing from other users
       console.log('Received drawing event:', drawData.type, drawData.userId, drawData.strokeId);
       this.canvasManager.applyRemoteDrawing(drawData);
     };
     
     this.wsClient.onCanvasState = (data) => {
-      // Load canvas state from server
       if (data.canvasData) {
         this.canvasManager.loadCanvasData(data.canvasData);
       }
@@ -208,7 +169,7 @@ class CollaborativeCanvasApp {
       });
       this.updateUsersList();
       
-      const totalUsers = this.users.size + 1; // +1 for current user
+      const totalUsers = this.users.size + 1;
       this.showNotification(`${data.username} joined • ${totalUsers} user${totalUsers > 1 ? 's' : ''} online`, 'success');
     };
     
@@ -218,7 +179,7 @@ class CollaborativeCanvasApp {
         this.users.delete(data.userId);
         this.updateUsersList();
         
-        const totalUsers = this.users.size + 1; // +1 for current user
+        const totalUsers = this.users.size + 1;
         this.showNotification(`${user.username} left • ${totalUsers} user${totalUsers > 1 ? 's' : ''} online`, 'warning');
       }
       // Remove their cursor
@@ -251,7 +212,6 @@ class CollaborativeCanvasApp {
     window.addEventListener('keydown', (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
       
-      // Undo/Redo
       if (ctrl && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -263,7 +223,6 @@ class CollaborativeCanvasApp {
         e.preventDefault();
         this.canvasManager.redo();
       }
-      // Tool shortcuts
       else if (e.key.toLowerCase() === 'b' && !ctrl) {
         e.preventDefault();
         this.canvasManager.setMode('brush');
