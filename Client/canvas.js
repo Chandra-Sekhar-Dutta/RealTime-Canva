@@ -3,6 +3,10 @@ export class CanvasManager {
     this.canvas = canvasElement;
     this.ctx = this.canvas.getContext('2d', { alpha: true });
     
+    // Separate canvas for user's own drawings (for undo/redo)
+    this.userCanvas = document.createElement('canvas');
+    this.userCtx = this.userCanvas.getContext('2d', { alpha: true });
+    
     // Separate canvas layer for remote users' drawings to prevent conflicts
     this.remoteCanvas = document.createElement('canvas');
     this.remoteCtx = this.remoteCanvas.getContext('2d', { alpha: true });
@@ -31,31 +35,36 @@ export class CanvasManager {
   // Resize canvas while preserving content and handling high-DPI displays
   setCanvasSize() {
     const rect = this.canvas.getBoundingClientRect();
-    const data = this.canvas.toDataURL();
+    const userData = this.userCanvas.toDataURL();
     const remoteData = this.remoteCanvas.toDataURL();
     
     const dpr = window.devicePixelRatio || 1;
     
     this.canvas.width = Math.floor(rect.width * dpr);
     this.canvas.height = Math.floor(rect.height * dpr);
+    this.userCanvas.width = this.canvas.width;
+    this.userCanvas.height = this.canvas.height;
     this.remoteCanvas.width = this.canvas.width;
     this.remoteCanvas.height = this.canvas.height;
     
     this.ctx.scale(dpr, dpr);
+    this.userCtx.scale(dpr, dpr);
     this.remoteCtx.scale(dpr, dpr);
     
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
+    this.userCtx.imageSmoothingEnabled = true;
+    this.userCtx.imageSmoothingQuality = 'high';
     this.remoteCtx.imageSmoothingEnabled = true;
     this.remoteCtx.imageSmoothingQuality = 'high';
     
-    const img = new Image();
-    img.onload = () => {
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    const userImg = new Image();
+    userImg.onload = () => {
+      this.userCtx.clearRect(0, 0, this.userCanvas.width, this.userCanvas.height);
+      this.userCtx.drawImage(userImg, 0, 0, rect.width, rect.height);
       this.composeLayers();
     };
-    img.src = data;
+    userImg.src = userData;
     
     const remoteImg = new Image();
     remoteImg.onload = () => {
@@ -65,16 +74,21 @@ export class CanvasManager {
     remoteImg.src = remoteData;
   }
   
-  // Merge remote users' drawings onto the main canvas for display
+  // Merge user's own drawings and remote users' drawings onto the display canvas
   composeLayers() {
-    this.ctx.save();
-    this.ctx.globalCompositeOperation = 'source-over';
-    this.ctx.imageSmoothingEnabled = true;
-    this.ctx.imageSmoothingQuality = 'high';
-    
     const rect = this.canvas.getBoundingClientRect();
-    this.ctx.drawImage(this.remoteCanvas, 0, 0, rect.width, rect.height);
+    
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.restore();
+    
+    // Draw user's canvas first
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.drawImage(this.userCanvas, 0, 0, rect.width, rect.height);
+    
+    // Draw remote canvas on top
+    this.ctx.drawImage(this.remoteCanvas, 0, 0, rect.width, rect.height);
   }
   
   setupEventListeners() {
@@ -103,20 +117,20 @@ export class CanvasManager {
     this.drawing = true;
     this.lastPos = this.getPointerPos(e);
     
-    this.ctx.lineCap = 'round';
-    this.ctx.lineJoin = 'round';
-    this.ctx.lineWidth = this.lineWidth;
+    this.userCtx.lineCap = 'round';
+    this.userCtx.lineJoin = 'round';
+    this.userCtx.lineWidth = this.lineWidth;
     
     if (this.mode === 'eraser') {
-      this.ctx.globalCompositeOperation = 'destination-out';
-      this.ctx.strokeStyle = 'rgba(0,0,0,1)';
+      this.userCtx.globalCompositeOperation = 'destination-out';
+      this.userCtx.strokeStyle = 'rgba(0,0,0,1)';
     } else {
-      this.ctx.globalCompositeOperation = 'source-over';
-      this.ctx.strokeStyle = this.strokeColor;
+      this.userCtx.globalCompositeOperation = 'source-over';
+      this.userCtx.strokeStyle = this.strokeColor;
     }
     
-    this.ctx.beginPath();
-    this.ctx.moveTo(this.lastPos.x, this.lastPos.y);
+    this.userCtx.beginPath();
+    this.userCtx.moveTo(this.lastPos.x, this.lastPos.y);
     
     if (this.mode === 'brush') {
       this.emitDrawEvent('start', this.lastPos);
@@ -127,9 +141,12 @@ export class CanvasManager {
     if (!this.drawing) return;
     
     const pos = this.getPointerPos(e);
-    this.ctx.lineTo(pos.x, pos.y);
-    this.ctx.stroke();
+    this.userCtx.lineTo(pos.x, pos.y);
+    this.userCtx.stroke();
     this.lastPos = pos;
+    
+    // Update display canvas in real-time
+    this.composeLayers();
     
     if (this.mode === 'brush') {
       this.emitDrawEvent('move', pos);
@@ -140,7 +157,7 @@ export class CanvasManager {
     if (!this.drawing) return;
     
     this.drawing = false;
-    this.ctx.closePath();
+    this.userCtx.closePath();
     this.redoStack.length = 0;
     
     try {
@@ -171,14 +188,13 @@ export class CanvasManager {
   
   pushUndo() {
     if (this.undoStack.length >= this.MAX_STACK) this.undoStack.shift();
-    this.undoStack.push(this.canvas.toDataURL());
-    if (this.redoStack.length > this.MAX_STACK) this.redoStack.shift();
+    this.undoStack.push(this.userCanvas.toDataURL());
   }
   
   undo() {
     if (this.undoStack.length === 0) return false;
     
-    this.redoStack.push(this.canvas.toDataURL());
+    this.redoStack.push(this.userCanvas.toDataURL());
     const dataUrl = this.undoStack.pop();
     this.applyDataUrl(dataUrl);
     return true;
@@ -187,7 +203,7 @@ export class CanvasManager {
   redo() {
     if (this.redoStack.length === 0) return false;
     
-    this.undoStack.push(this.canvas.toDataURL());
+    this.undoStack.push(this.userCanvas.toDataURL());
     const dataUrl = this.redoStack.pop();
     this.applyDataUrl(dataUrl);
     return true;
@@ -196,16 +212,26 @@ export class CanvasManager {
   applyDataUrl(dataUrl) {
     const img = new Image();
     img.onload = () => {
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+      const rect = this.canvas.getBoundingClientRect();
+      this.userCtx.save();
+      this.userCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.userCtx.clearRect(0, 0, this.userCanvas.width, this.userCanvas.height);
+      this.userCtx.restore();
+      this.userCtx.globalCompositeOperation = 'source-over';
+      this.userCtx.drawImage(img, 0, 0, rect.width, rect.height);
+      this.composeLayers();
     };
     img.src = dataUrl;
   }
   
   clear() {
     this.pushUndo();
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.userCtx.save();
+    this.userCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.userCtx.clearRect(0, 0, this.userCanvas.width, this.userCanvas.height);
+    this.userCtx.restore();
     this.redoStack.length = 0;
+    this.composeLayers();
   }
   
   download(filename = 'canvas.png') {
@@ -255,7 +281,7 @@ export class CanvasManager {
   }
   
   getCanvasData() {
-    return this.canvas.toDataURL();
+    return this.userCanvas.toDataURL();
   }
   
   loadCanvasData(dataUrl) {
