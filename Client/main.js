@@ -185,12 +185,25 @@ class CollaborativeCanvasApp {
       }
       // Remove their cursor
       this.updateRemoteCursor(data.userId, '', '', null);
+      // Remove their canvas layer
+      this.canvasManager.removeRemoteUser(data.userId);
     };
     
     this.wsClient.onCursorMove = (data) => {
       const user = this.users.get(data.userId);
       if (user) {
         this.updateRemoteCursor(data.userId, user.username, user.color, data.pos);
+      }
+    };
+    
+    this.wsClient.onClearCanvas = (data) => {
+      console.log('Clear canvas event received from:', data.userId);
+      // Only clear remote canvas if someone else cleared their drawings
+      if (data.userId !== this.userId) {
+        this.canvasManager.clearRemoteCanvas(data.userId);
+        const user = this.users.get(data.userId);
+        const username = user ? user.username : 'Someone';
+        this.showNotification(`${username} cleared their drawings`, 'info');
       }
     };
     

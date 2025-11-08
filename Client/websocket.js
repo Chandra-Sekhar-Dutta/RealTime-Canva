@@ -18,6 +18,7 @@ export class WebSocketClient {
     this.onCursorMove = null;
     this.onUsersUpdate = null;
     this.onUsernameAssigned = null;
+    this.onClearCanvas = null;
   }
   
   // Establish connection with fallback to polling if WebSocket fails
@@ -115,6 +116,11 @@ export class WebSocketClient {
       console.log('Username assigned:', data.username);
       this.username = data.username;
       if (this.onUsernameAssigned) this.onUsernameAssigned(data.username);
+    });
+    
+    this.socket.on('clear-canvas', (data) => {
+      console.log('Canvas cleared by:', data.userId);
+      if (this.onClearCanvas) this.onClearCanvas(data);
     });
     
     this.socket.on('error', (error) => {

@@ -7,9 +7,8 @@ export class CanvasManager {
     this.userCanvas = document.createElement('canvas');
     this.userCtx = this.userCanvas.getContext('2d', { alpha: true });
     
-    // Separate canvas layer for remote users' drawings to prevent conflicts
-    this.remoteCanvas = document.createElement('canvas');
-    this.remoteCtx = this.remoteCanvas.getContext('2d', { alpha: true });
+    // Map of remote user canvases - each user gets their own canvas layer
+    this.remoteCanvases = new Map();
     
     this.drawing = false;
     this.lastPos = { x: 0, y: 0 };
@@ -36,7 +35,12 @@ export class CanvasManager {
   setCanvasSize() {
     const rect = this.canvas.getBoundingClientRect();
     const userData = this.userCanvas.toDataURL();
-    const remoteData = this.remoteCanvas.toDataURL();
+    
+    // Save all remote canvas data
+    const remoteDataMap = new Map();
+    for (const [userId, remoteCanvas] of this.remoteCanvases) {
+      remoteDataMap.set(userId, remoteCanvas.canvas.toDataURL());
+    }
     
     const dpr = window.devicePixelRatio || 1;
     
@@ -44,19 +48,14 @@ export class CanvasManager {
     this.canvas.height = Math.floor(rect.height * dpr);
     this.userCanvas.width = this.canvas.width;
     this.userCanvas.height = this.canvas.height;
-    this.remoteCanvas.width = this.canvas.width;
-    this.remoteCanvas.height = this.canvas.height;
     
     this.ctx.scale(dpr, dpr);
     this.userCtx.scale(dpr, dpr);
-    this.remoteCtx.scale(dpr, dpr);
     
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
     this.userCtx.imageSmoothingEnabled = true;
     this.userCtx.imageSmoothingQuality = 'high';
-    this.remoteCtx.imageSmoothingEnabled = true;
-    this.remoteCtx.imageSmoothingQuality = 'high';
     
     const userImg = new Image();
     userImg.onload = () => {
@@ -66,12 +65,35 @@ export class CanvasManager {
     };
     userImg.src = userData;
     
-    const remoteImg = new Image();
-    remoteImg.onload = () => {
-      this.remoteCtx.clearRect(0, 0, this.remoteCanvas.width, this.remoteCanvas.height);
-      this.remoteCtx.drawImage(remoteImg, 0, 0, rect.width, rect.height);
-    };
-    remoteImg.src = remoteData;
+    // Restore remote canvases
+    for (const [userId, dataUrl] of remoteDataMap) {
+      const remoteCanvas = this.getOrCreateRemoteCanvas(userId);
+      const img = new Image();
+      img.onload = () => {
+        remoteCanvas.ctx.clearRect(0, 0, remoteCanvas.canvas.width, remoteCanvas.canvas.height);
+        remoteCanvas.ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      };
+      img.src = dataUrl;
+    }
+  }
+  
+  // Get or create a canvas for a remote user
+  getOrCreateRemoteCanvas(userId) {
+    if (!this.remoteCanvases.has(userId)) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: true });
+      
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = this.canvas.width;
+      canvas.height = this.canvas.height;
+      
+      ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      this.remoteCanvases.set(userId, { canvas, ctx });
+    }
+    return this.remoteCanvases.get(userId);
   }
   
   // Merge user's own drawings and remote users' drawings onto the display canvas
@@ -87,8 +109,10 @@ export class CanvasManager {
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.drawImage(this.userCanvas, 0, 0, rect.width, rect.height);
     
-    // Draw remote canvas on top
-    this.ctx.drawImage(this.remoteCanvas, 0, 0, rect.width, rect.height);
+    // Draw each remote user's canvas on top
+    for (const [userId, remoteCanvas] of this.remoteCanvases) {
+      this.ctx.drawImage(remoteCanvas.canvas, 0, 0, rect.width, rect.height);
+    }
   }
   
   setupEventListeners() {
@@ -231,6 +255,31 @@ export class CanvasManager {
     this.composeLayers();
   }
   
+  clearRemoteCanvas(userId) {
+    // Clear only a specific user's remote canvas (when they clear their drawings)
+    if (!userId) {
+      console.warn('clearRemoteCanvas called without userId');
+      return;
+    }
+    
+    const remoteCanvas = this.remoteCanvases.get(userId);
+    if (remoteCanvas) {
+      remoteCanvas.ctx.save();
+      remoteCanvas.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      remoteCanvas.ctx.clearRect(0, 0, remoteCanvas.canvas.width, remoteCanvas.canvas.height);
+      remoteCanvas.ctx.restore();
+      this.composeLayers();
+    }
+  }
+  
+  removeRemoteUser(userId) {
+    // Remove a user's canvas when they leave
+    if (this.remoteCanvases.has(userId)) {
+      this.remoteCanvases.delete(userId);
+      this.composeLayers();
+    }
+  }
+  
   download(filename = 'canvas.png') {
     const a = document.createElement('a');
     a.href = this.canvas.toDataURL('image/png');
@@ -250,33 +299,41 @@ export class CanvasManager {
     }
   }
   
-  // Draw remote user strokes on separate layer (including eraser strokes)
+  // Draw remote user strokes on their separate canvas layer (including eraser strokes)
   applyRemoteDrawing(drawData) {
-    const { type, pos, mode, color, width } = drawData;
+    const { type, pos, mode, color, width, userId } = drawData;
     
-    this.remoteCtx.lineCap = 'round';
-    this.remoteCtx.lineJoin = 'round';
-    this.remoteCtx.lineWidth = width;
+    if (!userId) {
+      console.warn('Drawing data missing userId:', drawData);
+      return;
+    }
+    
+    const remoteCanvas = this.getOrCreateRemoteCanvas(userId);
+    const ctx = remoteCanvas.ctx;
+    
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = width;
     
     if (mode === 'eraser') {
-      // Apply eraser effect to remote layer (erases remote drawings only)
-      this.remoteCtx.globalCompositeOperation = 'destination-out';
-      this.remoteCtx.strokeStyle = 'rgba(0,0,0,1)';
+      // Apply eraser effect to this user's layer only
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
     } else {
       // Normal brush drawing
-      this.remoteCtx.globalCompositeOperation = 'source-over';
-      this.remoteCtx.strokeStyle = color;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
     }
     
     if (type === 'start') {
-      this.remoteCtx.beginPath();
-      this.remoteCtx.moveTo(pos.x, pos.y);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
     } else if (type === 'move') {
-      this.remoteCtx.lineTo(pos.x, pos.y);
-      this.remoteCtx.stroke();
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
       this.composeLayers();
     } else if (type === 'end') {
-      this.remoteCtx.closePath();
+      ctx.closePath();
       this.composeLayers();
     }
   }
